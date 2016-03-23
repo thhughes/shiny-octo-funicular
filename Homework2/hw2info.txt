@@ -1,0 +1,7 @@
+located at: web.cs.wpi.edu/~cs4536/d16/Assignments/interp-functions.html
+
+Due Dates: 
+    20 Tests submitted by 5:00 PM Friday March 25
+    Peer Reviews of Tests Within 24 hours of your tests
+    Final Work submitted by : 11:59 PM Tuesday March 29
+
