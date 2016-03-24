@@ -9,7 +9,8 @@
   [plusC (l : ExprC) (r : ExprC)]
   [multC (l : ExprC) (r : ExprC)]
   [idC (i : symbol)]
-  [appC (f : ExprC) (arg : ExprC)]
+  [appC (fun : ExprC) (arg : ExprC)]
+  [fdC (param : symbol) (body : ExprC)]
   )
 ;; desugar -- returning a default/dummy value so file can be run
 ;; (define (desugar [e : ExprS]) : ExprC
@@ -34,20 +35,22 @@
 
 ;---------------------------------------------------------------------------------
 ;; interp -- returning a default/dummy value so file can be run
-(define (interp [e : ExprC] [fds : (listofFunDefC)][env : Env]) : number
+(define (interp [e : ExprC] [env : Env]) : Value
   (type-case ExprC e
-             [numC (n) n]
+             [numC (n) (numV n)]
              [idC (s) (lookup s env)]
-             [plusC (l r) (+ (interp l env fds)(interp r env fds))]
-             [multC (l r) (* (interp l env fds)(interp r env fds))]
-             [appC (fun arg) (local ([define fd (get-fundef fun fds)])
+             [plusC (l r) (numV+ (interp l env)(interp r env))]
+             [multC (l r) (numV* (interp l env)(interp r env))]
+             [appC (fun arg) (local ([define fd (interp fun env)])         ;; Running a function
                                (interp (fdC-body fd)
                                        (extend-env (bind (fdC-param fd)
-                                                         (interp arg env fds))
-                                                   mt-env)
-                                       fds))]
+                                                         (interp arg env))
+                                                   mt-env)))]
+             [fdC (param body) (funV param body)]                          ;; Calling a function
              ))
 
+;; NumV? Is this a numV?
+;; TYPE ERRRORRRRR
 
 
 (define (run sexp fds)

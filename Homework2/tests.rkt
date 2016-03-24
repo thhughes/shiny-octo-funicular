@@ -14,9 +14,9 @@
  # (* <Expr> <Expr>)                   ;; Multiplication
  # (- <Expr> <Expr>)                   ;; Subtraction
  # id                                  ;; Symbol other than: + - * fun if0 with
- # (fun (id ...) <Expr>)               ;; 
+ # (fun (id ...) <Expr>)               ;; This is lambda
  # (if0 <Expr> <Expr> <Expr>)          ;; if0 : conditional : (if this is 0)(do this)(else)
- # (with ((id <Expr>) ...) <Expr>)     ;; This is lambda expression
+ # (with ((id <Expr>) ...) <Expr>)     ;; This is a let synonym
  # (<Expr> <Expr> ...)                 ;; Not sure what this does:
  |#
 
@@ -59,4 +59,4 @@
 
 (test/exn (run with-2) "unbound")
 (test/exn (run with-3) "multiple")
-
+(test/exn (run '(+ (fun (x) x) 5)) "type")
