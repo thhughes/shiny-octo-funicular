@@ -55,6 +55,7 @@
                    (f 3 5))))
       (numV 15)) ;; Result
 
+(test (run '((fun (x) 5))))    ;; I belive this should be legal 
 
 (test/exn (run with-2) "unbound")
 (test/exn (run with-3) "multiple")
