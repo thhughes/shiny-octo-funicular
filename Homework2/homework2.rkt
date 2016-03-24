@@ -1,6 +1,5 @@
 #lang plai-typed
 
-
 ; Example tests from the thing online:
 (define p1 '(+ 3 4))
 
@@ -26,9 +25,24 @@
 
 (define psm-1 '(+ (- (* 1 2) (* 1 1)) 1))
 
-(define cond-1 '(if0 (* 1 0)("Hello World")("Goodbye World")))
+(define cond-1 '(if0 (* 1 0)(1)(2)))
 (define with-1 '(+ 2 ( with ((x 3)(y 4)) (+ x (* x y)))))
 (define with-2 '( with ((x 3)(y 4)) (+ x (* z y))))              ;; Unbound
 (define with-3 '(+ 2 ( with ((x 3)(x 4)) (+ x (* x y)))))        ;; multiple
 
+
+
+
+;; Tests;;
+(test (run p-1) 7)
+(test (run s-1) 2)
+(test (run m-1) 8)
+
+(test (run psm-1) 2)
+
+(test (run cond-1) 1)
+(test (run with-1) 17)
+
+(test/enx (run with-2) "unbound")
+(test/enx (run with-3) "multiple")
 
