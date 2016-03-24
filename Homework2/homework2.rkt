@@ -1,48 +1,106 @@
 #lang plai-typed
 
-; Example tests from the thing online:
-(define p1 '(+ 3 4))
+;; starter file for the extended basic interpreter assignment
 
-(test (run p1) (numV 7))
-(test/exn (run '(+ x 4)) "unbound")
+;---------------------------------------------------------------------------------
+;; surface syntax and parser : you should NOT need to edit this section
+
+; type used to capture a with-binding
+(define-type DefS
+  [defS (name : symbol) (val : ExprS)])
+
+; surface syntax for expressions
+(define-type ExprS
+  [numS (n : number)]
+  [plusS (l : ExprS) (r : ExprS)]
+  [bminusS (l : ExprS) (r : ExprS)]
+  [multS (l : ExprS) (r : ExprS)]
+  [idS (i : symbol)]
+  [appS (f : ExprS) (args : (listof ExprS))]
+  [if0S (c : ExprS) (t : ExprS) (e : ExprS)]
+  [funS (params : (listof symbol)) (body : ExprS)]
+  [withS (bindings : (listof DefS)) (body : ExprS)]
+  )
+
+; parses s-expressions into surface syntax
+(define (parse [s : s-expression]) : ExprS
+  (cond
+    [(s-exp-number? s) (numS (s-exp->number s))]
+    [(s-exp-symbol? s) (idS (s-exp->symbol s))]
+    [(s-exp-list? s)
+     (let ([sl (s-exp->list s)])
+       (cond [(s-exp-symbol? (first sl)) ;; built-in construct or calling function through an identifier
+              (case (s-exp->symbol (first sl))
+                [(+) (plusS (parse (second sl)) (parse (third sl)))]
+                [(*) (multS (parse (second sl)) (parse (third sl)))]
+                [(-) (bminusS (parse (second sl)) (parse (third sl)))]
+                [(if0) (if0S (parse (second sl)) (parse (third sl)) (parse (fourth sl)))]
+                [(fun) (funS (map s-exp->symbol (s-exp->list (second sl))) 
+                                (parse (third sl)))]
+                [(with) (withS (map (lambda (b) 
+                                      (let ([bl (s-exp->list b)])
+                                        (defS (s-exp->symbol (first bl)) (parse (second bl)))))
+                                    (s-exp->list (second sl)))
+                               (parse (third sl)))]
+                [else ;; must be a function call using function name
+                 (appS (idS (s-exp->symbol (first sl)))
+                       (map parse (rest sl)))])]
+             [(s-exp-list? (first sl)) ;; function call with complex expression in function position
+              (appS (parse (first sl))
+                    (map parse (rest sl)))]
+             [else (error 'parse "expected symbol or list after parenthesis")]))]
+    [else (error 'parse "unexpected input format")]))
+     
+;---------------------------------------------------------------------------------
+;; abstract syntax and desugar
+     
+(define-type ExprC
+  [numC (n : number)]
+  [plusC (l : ExprC) (r : ExprC)]
+  [multC (l : ExprC) (r : ExprC)]
+  [idC (i : symbol)]
+  [appC (f : ExprC) (arg : ExprC)]
+  [if0C (c : ExprC) (t : ExprC) (e : ExprC)]
+  [funC (param : symbol) (body : ExprC)]
+  )
+
+;; desugar -- returning a default/dummy value so file can be run
+(define (desugar [e : ExprS]) : ExprC
+  (numC 0))
+
+;---------------------------------------------------------------------------------
+;; output values
+
+(define-type Value
+  [numV (n : number)]
+  [closV (arg : symbol) (body : ExprC) (env : Env)])
+
+;---------------------------------------------------------------------------------
+;; Environments
+
+;; binding an identifier to a value
+(define-type Binding
+  [bind (name : symbol) (val : Value)])
+ 
+(define-type-alias Env (listof Binding))
+(define mt-env empty)
+
+;---------------------------------------------------------------------------------
+;; interp -- returning a default/dummy value so file can be run
+(define (interp [e : ExprC] [env : Env]) : Value
+  (numV 0)
+  )
 
 
-;; Things to remember:
-#|System needs to handle: 
-# (+ <Expr> <Expr>)                   ;; Addition
-# (* <Expr> <Expr>)                   ;; Multiplication
-# (- <Expr> <Expr>)                   ;; Subtraction
-# id                                  ;; Symbol other than: + - * fun if0 with
-# (fun (id ...) <Expr>)               ;; 
-# (if0 <Expr> <Expr> <Expr>)          ;; if0 : conditional : (if this is 0)(do this)(else)
-# (with ((id <Expr>) ...) <Expr>)     ;; This is lambda expression
-# (<Expr> <Expr> ...)                 ;; Not sure what this does:
-|#
+;---------------------------------------------------------------------------------
+;; API for running programs
 
-(define p-1 '(+ 3 4))
-(define s-1 '(- 4 2))
-(define m-1 '(* 2 4))
+; evaluates a program starting with a pre-populated environment
+; (this can be helpful in testing)
+(define (run/env sexp env)
+  (interp (desugar (parse sexp)) env))
 
-(define psm-1 '(+ (- (* 1 2) (* 1 1)) 1))
-
-(define cond-1 '(if0 (* 1 0)(1)(2)))
-(define with-1 '(+ 2 ( with ((x 3)(y 4)) (+ x (* x y)))))
-(define with-2 '( with ((x 3)(y 4)) (+ x (* z y))))              ;; Unbound
-(define with-3 '(+ 2 ( with ((x 3)(x 4)) (+ x (* x y)))))        ;; multiple
-
-
-
-
-;; Tests;;
-(test (run p-1) 7)
-(test (run s-1) 2)
-(test (run m-1) 8)
-
-(test (run psm-1) 2)
-
-(test (run cond-1) 1)
-(test (run with-1) 17)
-
-(test/enx (run with-2) "unbound")
-(test/enx (run with-3) "multiple")
+; evaluates a program in the empty environment
+(define (run sexp)
+  (run/env sexp mt-env))
 

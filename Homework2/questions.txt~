@@ -1,0 +1,5 @@
+:: Questions:
+
+- How does the environment update such that it knows what came before it if we're passing an empty environment?
+- Can we talk about how functions definitions should look and how they are called in our language?
+- 
