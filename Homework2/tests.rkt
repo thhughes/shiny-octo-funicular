@@ -19,12 +19,16 @@
 (test (run '(+ (- (* 1 2) (* 1 1)) 1)) (numV 2))
 
 (test (run '(if0 (* 1 0) 1 2)) (numV 1))
-
+(test (run '(if0 "Hello WOrld" 1 2)) "type")                    ;; Some Error 
 ;; Test single parameter things
 (test (run '(with ([f (fun (x) (* x x))] (f 3)))) (numV 9))     ;; Result
 ;; Test multiple parameter things
 (test (run '(with ([f (fun (x y) (* y x))](f 3 5)))) (numV 15)) ;; Result
 (test (run '((fun (x) 5))) 5)                                   ;; I belive this should be legal 
+;; Function Calling a function:
+(test (run '(with ([f (fun (x y) (*x y))][g (fun (z) (* z z))]) (f 1 (g 2))) ) (numV 4))
+
+
 
 (test/exn (run '(with ((x 3)(y 4)) (+ x (* z y)))) "unbound")
 (test/exn (run '(+ 2 (with ((x 3)(x 4)) (+ x (* x y))))) "multiple")
