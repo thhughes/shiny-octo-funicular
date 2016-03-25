@@ -20,43 +20,24 @@
  # (<Expr> <Expr> ...)                 ;; Not sure what this does:
  |#
 
-(define p-1 '(+ 3 4))
-(define s-1 '(- 4 2))
-(define m-1 '(* 2 4))
-
-(define psm-1 '(+ (- (* 1 2) (* 1 1)) 1))
-
-(define cond-1 '(if0 (* 1 0) 1 2))
-(define with-1 '(+ 2 (with ((x 3)(y 4)) (+ x (* x y)))))
-(define with-2 '(with ((x 3)(y 4)) (+ x (* z y))))              ;; Unbound
-(define with-3 '(+ 2 (with ((x 3)(x 4)) (+ x (* x y)))))        ;; multiple
-
-(define lambd-1 '(+ 1 (fun (+ 1 1))))
 
 
 ;; Tests;;
-(test (run p-1) (numV 7))
-(test (run s-1) (numV 2))
-(test (run m-1) (numV 8))
+(test (run '(+ 3 4)) (numV 7))
+(test (run '(- 4 2)) (numV 2))
+(test (run '(* 2 4)) (numV 8))
+(test (run '(+ (- (* 1 2) (* 1 1)) 1)) (numV 2))
 
-(test (run psm-1) (numV 2))
+(test (run '(if0 (* 1 0) 1 2)) (numV 1))
+(test (run '(+ 2 (with ((x 3)(y 4)) (+ x (* x y))))) (numV 17))
+(test (run '(with ((x 3)(y 4)) (+ x (* z y)))) (numV 3))
 
-(test (run cond-1) (numV 1))
-(test (run with-1) (numV 17))
+;; Test single parameter things
+(test (run '(with ([f (fun (x) (* x x))] (f 3)))) (numV 9))     ;; Result
+;; Test multiple parameter things
+(test (run '(with ([f (fun (x y) (* y x))](f 3 5)))) (numV 15)) ;; Result
+(test (run '((fun (x) 5))) 5)                                   ;; I belive this should be legal 
 
-(test (run lambd-1) (numV 3))
-;; Test single and parameter things
-(test (run '(with ([f (fun (x) (* x x))]
-                   (f 3))))
-      (numV 9));; result
-
-;; Test single and multiple parameter things
-(test (run '(with ([f (fun (x y) (* y x))]
-                   (f 3 5))))
-      (numV 15)) ;; Result
-
-(test (run '((fun (x) 5))))    ;; I belive this should be legal 
-
-(test/exn (run with-2) "unbound")
-(test/exn (run with-3) "multiple")
+(test/exn (run '(with ((x 3)(y 4)) (+ x (* z y)))) "unbound")
+(test/exn (run '(+ 2 (with ((x 3)(x 4)) (+ x (* x y))))) "multiple")
 (test/exn (run '(+ (fun (x) x) 5)) "type")
