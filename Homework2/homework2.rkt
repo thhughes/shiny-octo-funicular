@@ -105,7 +105,7 @@
 (define (interp [e : ExprC] [env : Env]) : Value
   (type-case ExprC e
              [numC (n) (numV n)]
-             [idC (n) (error 'interp "idC not implemented")] ;; (lookup n env) :: lookup not implemented
+             [idC (n) (lookup n env)]
              [plusC (l r) (numCMath '+ (interp l env) (interp r env))]
              [multC (l r) (numCMath '* (interp l env) (interp r env))]
              [if0C (c t e) (cond [(is-if0C-zero (interp c env))(interp t env)]
@@ -117,6 +117,18 @@
 
 
 ;; Interp helpers:
+;; lookup symbols in environment:
+(define (lookup [n : symbol][env : Env]) : Value
+  (cond
+    [(empty? env) (error 'lookup "Symbol was not found in the envirionment")]
+    [else (let ([envF (first env)])
+            (cond [(symbol=? n (bind-name envF))(bind-name envF)]
+                  [else (lookup n (rest env))])
+            )]
+    ))
+
+
+;; Math function
 (define (numCMath [s : symbol][l : Value][r : Value]) : Value
   (cond [(and (numV? l) (numV? r))
          (cond [(symbol=? s '+)(numV (+ (numV-n l)(numV-n r)))]
