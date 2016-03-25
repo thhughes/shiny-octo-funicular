@@ -67,17 +67,17 @@
 ;; desugar -- returning a default/dummy value so file can be run
 ;; Desugar With's into funC :: It's equivelant to a function that's being defined and is imediately called. 
 (define (desugar [e : ExprS]) : ExprC
-  (type-case ExprS e
+  (type-case Expers e
              [numS (n) (numC n)]
              [idS (s) (idC s)]
              [plusS (l r) (plusC (desugar l)(desugar r))]
              [multS (l r) (multC (desugar l)(desugar r))]
-             [bminusS (l r) (plusC (desugar l) (multC (numC -1)
+             [bminusS (l r) (plusC (desugar l) (multC (numV -1)
                                                       (desugar r)))]
              [if0S (c t e) (if0C (desugar c)(desugar t)(desugar e))]
-             [appS (f arg) (error 'desugar "appS Not Implented yet")]
-             [funS (params body) (error 'desugar "funS Not Implented yet")]
-             [withS (bindings body) (error 'desugar "withS Not Implented yet")]
+             [appS (error "Not Implented yet")]
+             [funS (error "Not Implented yet")]
+             [withS (error "Not Implented yet")]
              )
   )
   
@@ -105,33 +105,15 @@
 (define (interp [e : ExprC] [env : Env]) : Value
   (type-case ExprC e
              [numC (n) (numV n)]
-             [idC (n) (error 'interp "idC not implemented")] ;; (lookup n env) :: lookup not implemented
-             [plusC (l r) (numCMath '+ (interp l env) (interp r env))]
-             [multC (l r) (numCMath '* (interp l env) (interp r env))]
-             [if0C (c t e) (cond [(is-if0C-zero (interp c env))(interp t env)]
-                                 [else (interp e env)])]
-             [appC (f arg)(error 'interp "appC not implemented")]
-             [funC (param body)(error 'interp "funC not implemented")]
+             [idC (n) (error "not implemented")] ;; (lookup n env) :: lookup not implemented
+             [plusC (l r) (num+ (interp l env)(interp r env))]
+             [multC (l r) (num* (interp l env)(interp r env))]
+             [if0C (c t e) (error "not implemented")]
+             [appC (error "not implemented")]
+             [funC (error "not implemented")]
              )
   )
 
-
-;; Interp helpers:
-(define (numCMath [s : symbol][l : Value][r : Value]) : Value
-  (cond [(and (numV? l) (numV? r))
-         (cond [(symbol=? s '+)(numV (+ (numV-n l)(numV-n r)))]
-               [(symbol=? s '*)(numV (* (numV-n l)(numV-n r)))]
-               [else (error 'numCMath "Invalid Operator")])]
-         [else (error 'numCMath "One argument is not a number")]
-        ))
-
-;; If Case:
-(define (is-if0C-zero [condition : Value]) : boolean
-  (cond [(numV? condition)(= 0 (numV-n condition))]
-        [else (error 'if0C "Type Error: Condition should evaluate to NumV")])
-  )
-
-   
 
 ;---------------------------------------------------------------------------------
 ;; API for running programs
@@ -151,13 +133,4 @@
 ;; Tests
 
 ; Check if plus minus or multiplication work:
-"Checking Simple Addition, Subtraction, and Multiplication"
 (test (run '(+ 1 1)) (numV 2))
-(test (run '(- 1 1)) (numV 0))
-(test (run '(* 1 4)) (numV 4))
-(test (run '(* 0 (+ 1 (- 4 1)))) (numV 0))
-
-"Checking Conditional Tests"
-(test (run '(if0 0 1 0)) (numV 1))
-(test (run '(if0 1 1 0)) (numV 0))
-(test (run '(if0 (+ 1 0) 0 (* 2 3))) (numV 6))
