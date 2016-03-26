@@ -61,7 +61,7 @@
   [idC (i : symbol)]
   [appC (f : ExprC) (arg : ExprC)]
   [if0C (c : ExprC) (t : ExprC) (e : ExprC)]
-  [funC (param : symbol) (body : ExprC)]
+  [funC (param : (listof symbol)) (body : ExprC)]
   )
 
 ;; desugar -- returning a default/dummy value so file can be run
@@ -88,7 +88,7 @@
 
 (define-type Value
   [numV (n : number)]
-  [closV (arg : symbol) (body : ExprC) (env : Env)])
+  [closV (arg : (listof symbol)) (body : ExprC) (env : Env)])
 
 ;---------------------------------------------------------------------------------
 ;; Environments
@@ -110,8 +110,14 @@
              [multC (l r) (numCMath '* (interp l env) (interp r env))]
              [if0C (c t e) (cond [(is-if0C-zero (interp c env))(interp t env)]
                                  [else (interp e env)])]
-             [appC (f arg)(error 'interp "appC not implemented")]
-             [funC (param body)(error 'interp "funC not implemented")]
+             [appC (f arg) (error 'interp "appC not implemented yet")]
+             ;; [appC (f arg)(let ([f-val (interp f env)]
+             ;;                    (interp (closV-body f-val)
+             ;;                            (extend-env (bind (closV-arg f-val)
+             ;;                                              (interp arg env))
+             ;;                                        (closV-env f-val))) 
+             ;;                   ))]
+             [funC (param body)(closV param body env)]
              )
   )
 
