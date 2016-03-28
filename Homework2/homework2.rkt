@@ -123,11 +123,20 @@
                                                                 env)
                                             (closV-env (valid-closV closure)))))]
              ;; interp:funC: creates closures for the envirionment -- This is when a function is declared
-             [funC (param body)(closV param body env)]
+             [funC (param body)(cond [(not (are-doubles param))(closV param body env)]
+                                     [else (error 'interp "multiple definition error")])]
              )
   )
 
+
 ;; Interp helpers:
+;; are-doubles :: (listof 'a) -> boolean
+;; Checks if there are duplicates in a list and returns true if there are
+(define (are-doubles aList) : boolean
+  false)
+
+
+
 ;; valid-closV :: Value -> listof symbols or error
 ;; Checks if the thing is a closure and returns it if it is :: errors if not
 (define (valid-closV [val : Value]) : Value
