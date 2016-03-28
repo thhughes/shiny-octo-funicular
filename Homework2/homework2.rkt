@@ -59,7 +59,7 @@
   [plusC (l : ExprC) (r : ExprC)]
   [multC (l : ExprC) (r : ExprC)]
   [idC (i : symbol)]
-  [appC (f : ExprC) (arg : ExprC)]
+  [appC (f : ExprC) (arg : (listof ExprC))]
   [if0C (c : ExprC) (t : ExprC) (e : ExprC)]
   [funC (param : (listof symbol)) (body : ExprC)]
   )
@@ -75,9 +75,10 @@
              [bminusS (l r) (plusC (desugar l) (multC (numC -1)
                                                       (desugar r)))]
              [if0S (c t e) (if0C (desugar c)(desugar t)(desugar e))]
-             [appS (f arg) (error 'desugar "appS Not Implented yet")]
-             [funS (params body) (error 'desugar "funS Not Implented yet")]
-             [withS (bindings body) (error 'desugar "withS Not Implented yet")]
+             [appS (f arg) (appC (desugar f)(map desugar arg))]
+             [funS (params body) (funC params (desugar body))]
+             [withS (bindings body) (appC (funC (map defS-name bindings) (desugar body))
+                                          (map desugar (map defS-val bindings)))]
              )
   )
   
@@ -100,6 +101,7 @@
 (define-type-alias Env (listof Binding))
 (define mt-env empty)
 
+
 ;---------------------------------------------------------------------------------
 ;; interp -- returning a default/dummy value so file can be run
 (define (interp [e : ExprC] [env : Env]) : Value
@@ -110,25 +112,54 @@
              [multC (l r) (numCMath '* (interp l env) (interp r env))]
              [if0C (c t e) (cond [(is-if0C-zero (interp c env))(interp t env)]
                                  [else (interp e env)])]
-             [appC (f arg) (error 'interp "appC not implemented yet")]
-             ;; [appC (f arg)(let ([f-val (interp f env)]
-             ;;                    (interp (closV-body f-val)
-             ;;                            (extend-env (bind (closV-arg f-val)
-             ;;                                              (interp arg env))
-             ;;                                        (closV-env f-val))) 
-             ;;                   ))]
+    ;; appC takes an f and arg: exprC and listof ExprC
+    ;; We interp f to get the closure of what to do:
+    ;; Then we have to evaluate that:
+    ;; -- Interp the body with the environment being formed from the
+    ;; -- Closure Environment + Bindings from: (closure(args)) bound to: (appC(args))
+             [appC (f arg)(let ([closure (interp f env)])
+                            (interp (closV-body (valid-closV closure))
+                                    (append (new-env-for-interp (closV-arg (valid-closV closure))
+                                                                arg
+                                                                env)
+                                            (closV-env (valid-closV closure)))))]
              [funC (param body)(closV param body env)]
              )
   )
-
+;;(interp (closV-body f-val)
+;;                                    (cons (bind (closV-arg f-val)
+;;                                                (interp arg env))
+;;                                          (closV-env f-val)))
+;; (3 4 5) will choke on closV-body
 
 ;; Interp helpers:
+;; valid-closV :: Value -> listof symbols or error
+;; Checks if the thing is a closure and returns it if it is :: errors if not
+(define (valid-closV [val : Value]) : Value
+  (type-case Value val
+              [numV (n) (error 'interp "got numV instead of closV")]
+              [closV (arg body env) val]
+    ))
+
+
+;; new-env-for-interp :: listof symbol,passed Env, listof exprC -> listof binding
+;; Takes in: closV args, environment, appC args
+(define (new-env-for-interp [c-arg : (listof symbol)][a-arg : (listof ExprC)][env : Env]) : Env
+  (cond [(= (length c-arg)(length a-arg))(error 'appC "incorrect number of args")]
+        [else (map2 (lambda (c a) (bind c (interp a env))) c-arg a-arg)]
+        )
+  )
+
+
+
 ;; lookup symbols in environment:
 (define (lookup [n : symbol][env : Env]) : Value
   (cond
     [(empty? env) (error 'lookup "Symbol was not found in the envirionment")]
-    [else (let ([envF (first env)])
-            (cond [(symbol=? n (bind-name envF))(bind-name envF)]
+    [else (let* ([envF (first env)]
+                 [name (bind-name envF)]
+                 [body (bind-val envF)])
+            (cond [(symbol=? n name) body]
                   [else (lookup n (rest env))])
             )]
     ))
@@ -168,14 +199,47 @@
 ;--------------------------------------------------------------------------------
 ;; Tests
 
-; Check if plus minus or multiplication work:
-"Checking Simple Addition, Subtraction, and Multiplication"
-(test (run '(+ 1 1)) (numV 2))
-(test (run '(- 1 1)) (numV 0))
-(test (run '(* 1 4)) (numV 4))
-(test (run '(* 0 (+ 1 (- 4 1)))) (numV 0))
+;; Tests;; 14 Total
+(test (run '(+ 3 4)) (numV 7))
+(test (run '(- 4 2)) (numV 2))
+(test (run '(* 2 4)) (numV 8))
+(test (run '(+ (- (* 1 2) (* 1 1)) 1)) (numV 2))
 
-"Checking Conditional Tests"
-(test (run '(if0 0 1 0)) (numV 1))
-(test (run '(if0 1 1 0)) (numV 0))
-(test (run '(if0 (+ 1 0) 0 (* 2 3))) (numV 6))
+(test (run '(if0 (* 1 0) 1 2)) (numV 1))
+;;(test (run '(if0 "Hello WOrld" 1 2)) "type")                    ;; Some Error 
+;; Test single parameter things
+(test (run '(with ([f (fun (x) (* x x))] (f 3)))) (numV 9))     ;; Result
+;; Test multiple parameter things
+(test (run '(with ([f (fun (x y) (* y x))](f 3 5)))) (numV 15)) ;; Result
+(test (run '((fun (x) 5))) (numV 5))                                   ;; I belive this should be legal 
+;; Function Calling a function:
+(test (run '(with ([f (fun (x y) (*x y))][g (fun (z) (* z z))]) (f 1 (g 2))) ) (numV 4))
+
+
+
+(test/exn (run '(with ((x 3)(y 4)) (+ x (* z y)))) "unbound")
+(test/exn (run '(+ 2 (with ((x 3)(x 4)) (+ x (* x y))))) "multiple")
+(test/exn (run '(+ (fun (x) x) 5)) "type")
+(test/exn (run '(if0 (+ 1 0) 2)) "expected");; Tests;; 14 Total
+(test (run '(+ 3 4)) (numV 7))
+(test (run '(- 4 2)) (numV 2))
+(test (run '(* 2 4)) (numV 8))
+(test (run '(+ (- (* 1 2) (* 1 1)) 1)) (numV 2))
+
+(test (run '(if0 (* 1 0) 1 2)) (numV 1))
+(test (run '(if0 "Hello WOrld" 1 2)) "type")                    ;; Some Error 
+;; Test single parameter things
+(test (run '(with ([f (fun (x) (* x x))] (f 3)))) (numV 9))     ;; Result
+;; Test multiple parameter things
+(test (run '(with ([f (fun (x y) (* y x))](f 3 5)))) (numV 15)) ;; Result
+(test (run '((fun (x) 5))) 5)                                   ;; I belive this should be legal 
+;; Function Calling a function:
+(test (run '(with ([f (fun (x y) (*x y))][g (fun (z) (* z z))]) (f 1 (g 2))) ) (numV 4))
+
+
+
+(test/exn (run '(with ((x 3)(y 4)) (+ x (* z y)))) "unbound")
+(test/exn (run '(+ 2 (with ((x 3)(x 4)) (+ x (* x y))))) "multiple")
+(test/exn (run '(+ (fun (x) x) 5)) "type")
+(test/exn (run '(if0 (+ 1 0) 2)) "expected")
+
