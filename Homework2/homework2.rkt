@@ -133,8 +133,15 @@
 ;; are-doubles :: (listof 'a) -> boolean
 ;; Checks if there are duplicates in a list and returns true if there are
 (define (are-doubles aList) : boolean
-  false)
-
+  (cond [(empty? aList) false]
+        [(cons? aList) (cond [(in-list-more-than-once? (first aList) aList) true]
+                             [else (are-doubles (rest aList))])])
+  )
+;; Checks if val is in the list more than once. returns true if it is. 
+(define (in-list-more-than-once? val aList) : boolean
+  (not (equal? (- (length aList) 1)
+               (length (filter (lambda (x) (not (equal? val x))) aList))))
+  )
 
 
 ;; valid-closV :: Value -> listof symbols or error
