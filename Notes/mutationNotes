@@ -1,0 +1,221 @@
+#lang plai-typed
+
+(require (typed-in racket/sandbox [call-with-limits : (number boolean (-> 'a) -> 'a)]))
+
+;; initial implementation with environments and stores, before implementing boxes
+
+;; surface syntax and parser 
+
+(define-type ExprS
+  [numS (n : number)]
+  [plusS (l : ExprS) (r : ExprS)]
+  [bminusS (l : ExprS) (r : ExprS)]
+  [multS (l : ExprS) (r : ExprS)]
+  [idS (i : symbol)]
+  [appS (f : ExprS) (arg : ExprS)]
+  [if0S (c : ExprS) (t : ExprS) (e : ExprS)]
+  [lamS (param : symbol) (body : ExprS)]
+  [withS (var : symbol) (val : ExprS) (body : ExprS)]
+  [boxS (arg : ExprS)]
+  [unboxS (arg : ExprS)]
+  [setboxS (b : ExprS) (v : ExprS)]
+  [seqS (b1 : ExprS) (b2 : ExprS)]
+  [setS (var : symbol) (val : ExprS)]
+  )
+
+; parses s-expressions into surface syntax
+(define (parse [s : s-expression]) : ExprS
+  (cond
+    [(s-exp-number? s) (numS (s-exp->number s))]
+    [(s-exp-symbol? s) (idS (s-exp->symbol s))]
+    [(s-exp-list? s)
+     (let ([sl (s-exp->list s)])
+       (cond [(s-exp-symbol? (first sl)) ;; built-in construct or calling function through an identifier
+              (case (s-exp->symbol (first sl))
+                [(+) (plusS (parse (second sl)) (parse (third sl)))]
+                [(*) (multS (parse (second sl)) (parse (third sl)))]
+                [(-) (bminusS (parse (second sl)) (parse (third sl)))]
+                [(if0) (if0S (parse (second sl)) (parse (third sl)) (parse (fourth sl)))]
+                [(fun) (lamS (s-exp->symbol (first (s-exp->list (second sl)))) (parse (third sl)))]
+                [(with) (let ([binding (s-exp->list (first (s-exp->list (second sl))))])
+                          (withS (s-exp->symbol (first binding))
+                                 (parse (second binding))
+                                 (parse (third sl))))]
+                [(box) (boxS (parse (second sl)))]
+                [(unbox) (unboxS (parse (second sl)))]
+                [(setbox) (setboxS (parse (second sl)) (parse (third sl)))]
+                [(seq) (seqS (parse (second sl)) (parse (third sl)))]
+                [(set) (setS (s-exp->symbol (second sl)) (parse (third sl)))]
+                [else ;; must be a function application
+                 (appS (idS (s-exp->symbol (first sl)))
+                       (parse (second sl)))])]
+             [else (appS (parse (first sl))
+                         (parse (second sl)))]))]
+    [else (error 'parse "unexpected syntax")]))
+     
+;; abstract syntax and desugar
+     
+(define-type ExprC
+  [numC (n : number)]
+  [plusC (l : ExprC) (r : ExprC)]
+  [multC (l : ExprC) (r : ExprC)]
+  [idC (i : symbol)]
+  [appC (f : ExprC) (arg : ExprC)]
+  [if0C (c : ExprC) (t : ExprC) (e : ExprC)]
+  [lamC (arg : symbol) (body : ExprC)]
+  [boxC (arg : ExprC)]
+  [unboxC (arg : ExprC)]
+  [setboxC (b : ExprC) (v : ExprC)]
+  [seqC (b1 : ExprC) (b2 : ExprC)]
+  [setC (var : symbol) (arg : ExprC)]
+  )
+
+(define (desugar [as : ExprS]) : ExprC
+  (type-case ExprS as
+    [numS (n) (numC n)]
+    [plusS (l r) (plusC (desugar l)
+                        (desugar r))]
+    [multS (l r) (multC (desugar l)
+                        (desugar r))]
+    [bminusS (l r) (plusC (desugar l)
+                          (multC (numC -1) (desugar r)))]
+    [idS (i) (idC i)]
+    [lamS (param body) (lamC param (desugar body))]
+    [appS (f arg) (appC (desugar f) (desugar arg))]
+    [if0S (c t e) (if0C (desugar c) (desugar t) (desugar e))]
+    [withS (var val body) (appC (lamC var (desugar body)) (desugar val))]
+    [boxS (arg) (boxC (desugar arg))]
+    [unboxS (arg) (unboxC (desugar arg))]
+    [setboxS (arg val) (setboxC (desugar arg) (desugar val))]
+    [seqS (e1 e2) (seqC (desugar e1) (desugar e2))]
+    [setS (var arg) (setC var (desugar arg))]
+    ))
+
+;; output values and interpreter result values
+
+(define-type Value
+  [numV (n : number)]
+  [boxV (l : Location)]
+  [closV (arg : symbol) (body : ExprC) (env : Env)])
+
+(define-type Result
+  [v*s (v : Value) (s : Store)])
+
+;; Environments
+
+(define-type Binding
+  [bind (name : symbol) (loc : Location)])
+ 
+(define-type-alias Env (listof Binding))
+(define mt-env empty)
+(define extend-env cons)
+
+; return first value bound to id in env, or raise error if id is not found
+(define (lookup [id : symbol] [env : Env]) : Location
+  (cond [(empty? env) (error 'lookup (string-append "unbound identifier " (to-string id)))]
+        [(cons? env) (if (symbol=? id (bind-name (first env)))
+                         (bind-loc (first env))
+                         (lookup id (rest env)))]))
+
+;; Store
+
+(define-type-alias Location number)
+ 
+(define-type Storage
+  [cell (location : Location) (val : Value)])
+ 
+(define-type-alias Store (listof Storage))
+(define mt-store empty)
+(define override-store cons)
+
+(define (fetch [loc : Location] [sto : Store]) : Value
+  (cond [(empty? sto) (error 'fetch "Memory address out of bounds")]
+        [(cons? sto) (if (= loc (cell-location (first sto)))
+                         (cell-val (first sto))
+                         (fetch loc (rest sto)))]))
+
+; operators on numVs
+
+(define (num+ [l : Value] [r : Value]) : Value
+  (cond
+    [(and (numV? l) (numV? r))
+     (numV (+ (numV-n l) (numV-n r)))]
+    [else
+     (error 'num+ "type error: one argument was not a number")]))
+
+(define (num* [l : Value] [r : Value]) : Value
+  (cond
+    [(and (numV? l) (numV? r))
+     (numV (* (numV-n l) (numV-n r)))]
+    [else
+     (error 'num* "type error: one argument was not a number")]))
+
+(define (num0? [v : Value]) : boolean
+  (if (numV? v) 
+      (zero? (numV-n v))
+      (error 'num0? "type error: argument was not a number")))
+
+;; interpreter
+
+(define (interp [a : ExprC] [env : Env] [sto : Store]) : Result
+  (type-case ExprC a
+    [numC (n) (v*s (numV n) sto)]
+    [plusC (l r) (type-case Result (interp l env sto)
+                   [v*s (v-l s-l)
+                        (type-case Result (interp r env s-l)
+                          [v*s (v-r s-r)
+                               (v*s (num+ v-l v-r) s-r)])])]
+    [multC (l r) (type-case Result (interp l env sto)
+                   [v*s (v-l s-l)
+                        (type-case Result (interp r env s-l)
+                          [v*s (v-r s-r)
+                               (v*s (num* v-l v-r) s-r)])])]
+    [idC (i) (v*s (fetch (lookup i env) sto) sto)] 
+    [lamC (args body) (v*s (closV args body env) sto)]
+    [appC (f a)
+     (type-case Result (interp f env sto)
+       [v*s (v-f s-f)
+            (type-case Result (interp a env s-f)
+              [v*s (v-a s-a)
+                   (let ([where (next-addr)])
+                      (interp (closV-body v-f)
+                              (extend-env (bind (closV-arg v-f) where) 
+                                          (closV-env v-f))
+                              (override-store (cell where v-a) s-a)))])])]
+    [if0C (c t e) (type-case Result (interp c env sto)
+                    [v*s (v-a s-a)
+                         (if (num0? v-a)
+                             (interp t env s-a)
+                             (interp e env s-a))])]
+    [seqC (b1 b2) (type-case Result (interp b1 env sto)
+                    [v*s (v-b1 s-b1)
+                         (interp b2 env s-b1)])]
+    [boxC (a) (type-case Result (interp a env sto)
+                [v*s (v-a s-a)
+                      (let ([addr (next-addr)])
+                        (v*s (boxV addr)
+                             (override-store (cell addr v-a))
+                                              s-a))])]
+    [unboxC (a) ...]
+  
+;    [setboxC (b v) ...] 
+;    [setC (var val) ...]
+    ; remove next line after filling in the commented-out cases
+    [else (error 'interp "Running construct we haven't implemented yet")]
+    ))
+
+
+(define next-addr
+  (let ([n (box 100)])
+    (lambda ()
+      (begin (set-box! n (add1 (unbox n)))
+              (unbox n)))))
+
+;; putting it all together
+
+; a run-command with timeouts on infinite loops
+(define (run sexp)
+  (call-with-limits 
+   10 #f
+   (lambda ()
+     (v*s-v (interp (desugar (parse sexp)) mt-env mt-store)))))

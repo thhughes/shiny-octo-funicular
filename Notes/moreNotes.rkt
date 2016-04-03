@@ -50,3 +50,79 @@
 ;; If we're passing the environment along this will evaluate
 ;; Instead of throwing an unbound error becasue passing 
 ;; along the environent destroys scope
+
+
+;; What about: 
+(with ([a (box 1)])
+	(with ([f (fun (x) (+ x (unbox a))]))
+		(setq
+			(setbox a 2)
+			(f 10)))
+
+;; This is going to return (12)
+;; We want the scope to be static
+;; but we want dynamic extent :: which value associate with binding
+
+;; The environment's job is to manaje scope
+
+(define-type Binding 
+	(bind (name: symbol) (loc : Location)))
+
+(define-type-alias Location number)
+(define-type Storage
+	[cell (loc :location)(val :Value)]
+	)
+
+;; pictorally: x -> [100] -> [numV 5]
+
+
+
+
+;; Interp is going to change: 
+(define (interp (e : ExprC)(env : Env)(sto : Store))
+	;;[plusC (l r)(numV+ (interp l env)(interp r env))] OLD PlusC
+	[plusC (l r)
+		(type-case Result (interp l env sto)
+			[v*s (val-r newSto) (type-case Result (interp r env newSto)
+									[v*s (val-l sto-r) (v*s (numV+ val-l val-r) sto-r)])])])
+
+	(interp r env sto))] ;; New plusC needs to return the value AND the store
+	)
+
+
+(define-type Result
+	[v*s (v : value)(s : store)])
+
+
+
+
+
+;; What are the differences between? 
+(with ([b (box 6)])
+	(unbox b))
+;; and
+(with ([b 6])
+	b)
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
