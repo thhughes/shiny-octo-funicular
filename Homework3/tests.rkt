@@ -35,17 +35,98 @@
  ;; ;; | (set id <Expr>)                   ;; Variable assignment
 
 
-; Top Ten Tests:
-"Test that mutation is passed across function calls"
-(define mutated-math-of-box '(with ([b (box 1)])
-                                  (+ (seq (setbox b (* 4 (unbox b)))
-                                          (unbox (seq (setbox b 100)
-                                                      b)))
-                                     (seq (setbox b (- 10 (unbox b)))
-                                          (unbox (seq (setbox b 100)
-                                                      b)))
-                                     ))) ;; Should return 200
-(test (run mutated-math-of-box) (numV 200))
+
+; --------------------------------------------------------------------
+; Main Tests
+
+
+
+
+
+
+
+
+
+
+
+; --------------------------------------------------------------------
+; Other Tests
+
+;; Basic Tests:
+"Test making a box successfully creates a box"
+(define making-box-works '(with ([b (box 1)])
+                                (boxV? b)))
+(test (run making-box-works) true)
+
+"Test that making a box and unboxing it returns the value set to the box"
+(test (run '(with ([b (box 1)])
+                  (unbox b))) (numV 1))
+
+"Test that mutating a box while unboxing it returns the correct box"
+(test (run '(with ([b (box 1)])
+                  (unbox (seq (setbox b 10)
+                              b))))
+      (numV 10))
+"Test that mutating a box that doesn't exist errors"
+(test/exn (run '(unbox b)) "unbound")
+
+"Test that mutating within a different scope impacts the errors produced"
+(test/exn (run '(with ([x 4])
+                      (+ (seq (with ([b (box 6)])) 4)
+                         (unbox b)))) "unbound")
+
+
+"Test correct scoping and store passing in nested with statements"
+(define nested-with-scoping-and-store-passing '(with ([b (box 1)])
+                                                     (seq (with ([b (box 3)])
+                                                                (setbox b 10000))
+                                                          (unbox b))))
+(test (run nested-with-scoping-and-store-passing) (numV 1))
+
+"Test functions returning proper store"
+(define functions-returning-proper-store '(with ([b (box 0)])
+                                                (with ([f (fun (x) (setbox b (+ (unbox b) 10)))])
+                                                      (unbox (seq (f 10)
+                                                                  (f 10))))))
+(test (run functions-returning-proper-store) (numV 20))
+
+
+"Test Seq executes in the correct order"
+(define seq-exec-order '(with ([b (box 4)])
+                              (unbox (seq (setbox b (* (unbox b) 0))
+                                          (setbox b (+ (unbox b) 1))))))
+(test (run seq-exec-order) (numV 1))
+
+"Addition carries store across sides"
+(define addition-carries-sto '(with ([b (box 1)])
+                                    (+ (seq (setbox b 2)
+                                            b)
+                                       (seq (setbox b 3)
+                                            b))))
+(test (run addition-carries-sto) (numV 5))
+
+"Subtraction carries store across sides"
+(define subtraction-carries-sto '(with ([b (box 1)])
+                                       (* (seq (setbox b 2)
+                                               b)
+                                          (seq (setbox b 3)
+                                               b))))
+(test (run addition-carries-sto) (numV 6))
+
+
+"Multiplication carries store across sides"
+(define multiplication-carries-sto '(with ([b (box 1)])
+                                          (- (seq (setbox b 3)
+                                                  b)
+                                             (seq (setbox b 2)
+                                                  b))))
+(test (run addition-carries-sto) (numV 1))
+
+
+"Testing boxing a box"
+(test (run '(with ([b (box 1)])
+                  (with ([c (box b)])
+                        (boxV? (unbox c))))) true)
 
 
 "Test that variables function and can be mutated"
@@ -53,7 +134,7 @@
                                    (+ (seq (set x (* x 4))
                                            x) ;; 4
                                       (seq (set y (- y 2))
-                                           (set y (+ 50 (set y 50))));;4
+                                           (set y (+ 50 (set y 50))));; 100
                                    )) ;;  104
 (test (run basic-variable-test) (numV 104))
 
@@ -66,70 +147,3 @@
                                              (seq (setbox b 0)        ;; changes b to 0
                                                   (+ x (unbox b)))))) ;; should be 0
 (test (run with-if-mutation-passing) (numV 0))
-
-"Test the scoping of mutation within with statements"
-;; This tests to make sure that when the with scope changes the values that are edited in the
-;; store stay edited, as the store is passed along.
-(define with-scoping-mutation-1 '(with ([x 0])
-                                       (seq (with ([x 4])
-                                                  (set x 100))
-                                            (set x (+ x x))
-                                            x)))
-(test (run with-scoping-mutation-1) (numV 200))
-
-"Test the scoping of mutation within a function"
-(define scoping-mutation-in-functions '(with ([x 4])
-                                             (seq (with ([f (y) (set x y)])
-                                                        (f 5))
-                                                  x)))
-(test (run scoping-mutation-in-functions)(numV 5))
-
-
-;; TODO :: Create variable in internal scope and reference it in external
-;;      :: This should error because the variable doesn't exist in the internal scope anymore (in the environment)
-
-
-;; TODO :: Make a variable name the same as a paramater name?
-;;      :: Low priority test, wuld be similar to last suite. 
-
-
-;; TODO :: Test that ensures that mutation is passed from one side of the sequence to the other
-;;      :: although I think that the first test in this list checks that too.
-
-
-;; TODO :: Test to make sure that boxC is using the coorect store's in all it's calls
-;;      :: If it were to use the interp-sto instead of the returned s-a then the mutations would stop existing.
-;;      :: so this test needs to have a seq inside of a (box ...) that changes the scoped values of something else.
-
-
-;; TODO :: Test that there is an order to addition subtraction etc, such that the mutation enforces an order we woudl expect.
-
-
-
-
-
-
-; --------------------------------------------------------------------
-; Other Tests
-
-
-
-
-
-
-
-
-; ---------------------------------------------------------------------
-; thoughts:
-;; [appC (f a)
-;;       (type-case Result (interp f env sto)
-;;                  [v*s (v-f s-f)
-;;                       (type-case Result (interp a env s-f)
-;;                                  [v*s (v-a s-a)
-;;                                       (let ([where (new-loc)])
-;;                                         (interp (closV-body v-f)
-;;                                                 (extend-env (bind (closV-arg v-f)
-;;                                                                   where)
-;;                                                             (closV-env v-f))
-;;                                                 (override-store (cell where v-a) s-a)))])])]
-;; What happens if the wrong stores and environments are passed along on this?
