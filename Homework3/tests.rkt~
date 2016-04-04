@@ -1,0 +1,84 @@
+#lang Plai-typed
+
+;; These are tests for the Mutation assignment
+;; Goals of the assignment: Write tests to check the language
+;                         : Your tests may be limited to mutation related things
+;                         : peer review will only occur above the 10 line.
+
+;;; Your tests should not:
+;   - rely on the specific address locations in expected answers (because locations could be different)
+;   - If you run something that returns a box it can be:
+;     - (test (boxV? (run '(box 5))) true )
+
+;;; Standard Error Messages:
+;   - "unbound"  :: unbound identifier
+;   - "multiple" :: same identifier multiple times in the same with or parameter list
+;   - "expected" :: grammar violation
+;   - "memory"   :: reference to unused memory/store location
+
+
+
+;; Language Grammar:
+;; <Expr> ::= number
+ ;; ;; | (+ <Expr> <Expr>)
+ ;; ;; | (* <Expr> <Expr>)
+ ;; ;; | (- <Expr> <Expr>)
+ ;; ;; | id                                ;; ID's or Variables
+ ;; ;; | (fun (id ...) <Expr>)             ;; lambda
+ ;; ;; | (if0 <Expr> <Expr> <Expr>)        ;; <if is 0> <do this> <else> 
+ ;; ;; | (with ((id <Expr>) ... ) <Expr>)  ;; with in racket
+ ;; ;; | (<Expr> <Expr> ...)               ;; Run Expressions
+ ;; ;; | (box <Expr>)                      ;; Create box
+ ;; ;; | (unbox <Expr>)                    ;; Get value from box
+ ;; ;; | (setbox <Expr> <Expr>)            ;; Assign value in box
+ ;; ;; | (setq <Expr> <Expr>)              ;; Begin Equivelant
+ ;; ;; | (set id <Expr>)                   ;; Variable assignment
+
+
+; Top Ten Tests:
+"Test that mutation is passed across function calls"
+(define mutated-math-of-box '(with ([b (box 1)])
+                                  (+ (seq (setbox b (* 4 (unbox b)))
+                                          (unbox b))
+                                     (seq (setbox b (- 10 (unbox b)))
+                                          (unbox b))
+                                     ))) ;; Should return 10
+(test (run mutated-math-of-box) (numV 10))
+
+
+"This test ensures that unbox is using the correct store when executing"
+;; Possible errors this will catch:
+; - Using interp's store and not the resulted store from interping the value in unbox:: will result in (numV 0)
+; - Returning the interp store in the final return instead of the store from the interp of the value in unbox:: will result in (numV 1)
+(define correct-store-passing '(with ([b (box 0)])
+                                     (+ (unbox (setq (setbox b 1)
+                                                     b))
+                                        (unbox b))));; Should return 2
+(test (run correct-store-passing) (numV 2))
+
+
+
+"Test that variables function and can be mutated"
+(define basic-variable-test '(with ([x 1][y 3])
+                                   (+ (seq (set x (* x 4))
+                                           x)
+                                      (seq (set y (- y 2))
+                                           y))
+                                   )) ;; Should return 5
+(test (run basic-variable-test) (numV 5))
+                                   
+
+
+
+
+
+
+
+
+
+
+
+
+
+; --------------------------------------------------------------------
+; Other Tests
