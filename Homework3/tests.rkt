@@ -39,29 +39,6 @@
 ; --------------------------------------------------------------------
 ; Main Tests
 
-
-
-
-
-
-
-
-
-
-
-; --------------------------------------------------------------------
-; Other Tests
-
-;; Basic Tests:
-"Test making a box successfully creates a box"
-(define making-box-works '(with ([b (box 1)])
-                                (boxV? b)))
-(test (run making-box-works) true)
-
-"Test that making a box and unboxing it returns the value set to the box"
-(test (run '(with ([b (box 1)])
-                  (unbox b))) (numV 1))
-
 "Test that mutating a box while unboxing it returns the correct box"
 (test (run '(with ([b (box 1)])
                   (unbox (seq (setbox b 10)
@@ -97,31 +74,6 @@
                                           (setbox b (+ (unbox b) 1))))))
 (test (run seq-exec-order) (numV 1))
 
-"Addition carries store across sides"
-(define addition-carries-sto '(with ([b (box 1)])
-                                    (+ (seq (setbox b 2)
-                                            b)
-                                       (seq (setbox b 3)
-                                            b))))
-(test (run addition-carries-sto) (numV 5))
-
-"Subtraction carries store across sides"
-(define subtraction-carries-sto '(with ([b (box 1)])
-                                       (* (seq (setbox b 2)
-                                               b)
-                                          (seq (setbox b 3)
-                                               b))))
-(test (run addition-carries-sto) (numV 6))
-
-
-"Multiplication carries store across sides"
-(define multiplication-carries-sto '(with ([b (box 1)])
-                                          (- (seq (setbox b 3)
-                                                  b)
-                                             (seq (setbox b 2)
-                                                  b))))
-(test (run addition-carries-sto) (numV 1))
-
 
 "Testing boxing a box"
 (test (run '(with ([b (box 1)])
@@ -147,3 +99,45 @@
                                              (seq (setbox b 0)        ;; changes b to 0
                                                   (+ x (unbox b)))))) ;; should be 0
 (test (run with-if-mutation-passing) (numV 0))
+
+"Test the type checking for boxes and variables"
+(test/exn (run '(with ([x 4])
+                      (unbox x)))
+          "type")
+                    
+
+
+
+; --------------------------------------------------------------------
+; Other Tests
+
+"Test making a box successfully creates a box"
+(define making-box-works '(with ([b (box 1)])
+                                (boxV? b)))
+(test (run making-box-works) true)
+
+"Test that making a box and unboxing it returns the value set to the box"
+(test (run '(with ([b (box 1)])
+                  (unbox b))) (numV 1))
+                  
+"Multiplication carries store across sides"
+(define Multiplication-carries-sto '(with ([b (box 1)])
+                                       (* (seq (setbox b 2)
+                                               b)
+                                          (seq (setbox b 3)
+                                               b))))
+(test (run Multiplication-carries-sto) (numV 6))
+
+"Addition carries store across sides"
+(define addition-carries-sto '(with ([b (box 1)])
+                                    (+ (seq (setbox b 2)
+                                            b)
+                                       (seq (setbox b 3)
+                                            b))))
+(test (run addition-carries-sto) (numV 5))
+
+"Check to ensure that static scope works for boxes or variables"
+(define static-scope-nested-with-boxes '(with ([b (box 1)])
+                                              (with ([b (box 3)])
+                                                    (unbox b))))
+(test (run static-scope-nested-with-boxes) (numV 3))
