@@ -1,0 +1,60 @@
+;; Test for Pass by Reference or Pass by Value:
+;; If this test is passed, then it will be pass by reference:
+;; If this test is failed, then it will be pass by value:
+(define testPBR '(with ([x 1][y 2])
+                       (seq (with ([f (fun (z) (set z 10))])
+                                  (f y))
+                            (+ x y))))
+(test (run testPBR) (numV 11))
+
+
+;; Test for Static Scope or Dynamic Scoping:
+;; If this test is passed, then it will be a statically scoped language
+;; If this test is failed, then it will be a dynamically scoped language
+(define testScope '(with ([x 1])
+                         (with ([foo (fun (y) (+ x y))])
+                               (with ([x 2])
+                                     (foo 10)))))
+
+(test (run testScope) (numV 11))
+
+
+;; Test Lazy or Eager evaluation
+;; If this test passes, then it is lazy evaluation
+;; If this test fails, then it is an eager evaluation
+(define testLazy '(with ([x 1])
+                        (with ([simpMath (fun (x) (+ 1 2))])
+                              (with ([mutator (fun (y) (set x 100))])
+                                    (seq (simpMath (mutator 0))
+                                         x)))))
+(test (run testLazy) (numV 1))
+
+
+
+
+
+
+
+
+
+
+
+;; Test for Mutation Information:
+(define mutationTestOne '(with ([x (box 4)])
+                               (with ([y x])
+                                     (seq (setbox y 10)
+                                          (unbox x)))))
+
+(define mutationTestTwo '(with ([b (box 3)])
+                               (unbox (seq (setbox b 4)
+                                           b))))
+
+(define testSetboxReturnsCorrectly '(with ([b (box 5)])
+                                          (setbox b 100)))
+
+
+(define mutationTestingWithScopeChange '(with ([x (box 10)])
+                                              (seq ( with([y 10])
+                                                         (setbox x 100))
+                                                   (unbox x))))
+

@@ -1,0 +1,22 @@
+;; Testing Pass by value vs. Pass by reference:
+(with ([x 1][y 2])
+      (seq (with ([f (fun (z) (set z 10))])
+                 (f y))
+           (+ x y)))
+;; If this is PFV : Returns 3
+;; If this is PBR : Returns 11
+
+
+;; Attempt at figuring out dynamic vs. static scope:
+(with ([f2 (fun (y) (+ x y))])
+      (with ([f1 (fun (x))])
+            (f1 3)))
+
+(with ([x 1])
+      (with ([foo (fun (y) (+ x y))])
+            (with ([x 2])
+                  (foo 10))))
+
+
+
+
