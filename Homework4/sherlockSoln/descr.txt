@@ -1,0 +1,37 @@
+Key Features Observed:
+ - Static V. Dynamic Scope
+ - Pass by Reference v. Pass by Value
+ - Lazy Evaluation or Eager Evaluation
+ - How Mutation Works (I don't know the specific termanology for this)
+
+Sherlock::
+  - Static scoped
+  - Pass by Reference
+  - Eager Evaluation
+  - Mutation is occuring the same way as in our language, dynamically scoped?
+
+Explaination off the tests that were run:
+  - Static Scope occurs because the environment is clearly binding functions
+    with their current declarations of variables and not rebinding them
+    as they are changed in inner scopes. This means that the environment is being
+    treated like we are treating it in our language. 
+
+  - Pass by reference is occuring because when the system looks to interp
+    the function it is clearly not only finding the value that is tied to that
+    id in the store, but it is also linking things (either through bindings
+    or through the environment) such that when the variables in the function
+    scope change, it is changing the value in the store such that when the
+    scope later changes those changes persist due to the way that the
+    scope is handled.
+
+  - Eager evaluation is occuring because the system is not waiting until
+    the absolute last moment to interp arguments or parts of a function. As seen
+    in sherlock, the calling of a function causes the system to interp it
+    for a value, instead of just storing it and waiting to see if it is being
+    used in a later place (as would be the case if this was lazy).
+
+  - Mutation is occuring very differently than in marple, but very similarly
+    (if not identically) to our language. The system is passing the store
+    from one argument to the next regardless of scope. As the scope changes
+    the value of the store does not, the store only changes when functions
+    try to change the store. 

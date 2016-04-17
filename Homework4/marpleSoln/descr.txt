@@ -1,0 +1,51 @@
+Key Features Observed:
+ - Static V. Dynamic Scope
+ - Pass by Reference v. Pass by Value
+ - Lazy Evaluation or Eager Evaluation
+ - How Mutation Works (I don't know the specific termanology for this)
+
+Marple::
+  - Static scoped
+  - Pass by Value
+  - Lazy Evaluation
+  - Something weird is happening with mutation.
+
+Explaination off the tests that were run:
+  - Static Scope occurs because the environment is clearly binding functions
+    with their current declarations of variables and not rebinding them
+    as they are changed in inner scopes. This means that the environment is being
+    treated like we are treating it in our language. 
+
+  - Pass by value is occuring beause the system is only looking up things in the
+    store and not relating them to other sub-variables that would allow the changes
+    to persist with scope. IMPORTANT POINT: this could also be happening because
+    changes do not persist with scope as will be talked about later. This
+    would mean that due to the handling the scope the language appears to be pass
+    by value but is actually pass by reference where that change is not persistent.
+
+  - Lazy Evaluation is clear because only the things that are 'absolutely' needed
+    are interpreted. This is shown in the test due to the fact that the argument
+    (mutator being called as a function) is never interprated even though it is called.
+    This is because while the body of the simpMath function is being interp'ed
+    there is no call to the input arguments, thus they are not absolutely needed.
+
+  - Mutation:
+    Something strange is happening with mutation, it is acting very similarly to how
+    the environment acts in our languate which leads me to believe that it is a
+    using a static store, not a dynamic store. However, it is also possible that the
+    environment is being used to cover up the need for mutations in the store. By this
+    I mean that if 'x' is in the environment and is changed in an internal scope, that
+    instead of changing it in the store a new version of 'x' is added to the environment
+    with a new value. Because that value is apart of the envionment it no longer exists when
+    scope retracts.
+
+    Part of the reason I believe one of these things is occuring is because I know that
+    the (setbox id ...) is correctly setting something (weather it's the origional id or a new
+    one I am unsure) beause it returns the value that is set. I also know that when
+    a variable like 'x' is assigned to a box in one scope, and then in another scope a
+    variable 'y' is assigned to 'x' and y is (setbox y ...)'ed the value of x does not change.
+    and if you observe the value of y it has not changed either - meaning they are likely
+    pointing at the same thing.
+
+    Exactly what the termanology is describing this I am unsure, however this is what
+    is occuring. 
