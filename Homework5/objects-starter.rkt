@@ -15,10 +15,19 @@
                         (lamS (list 'msg)
                               (varcaseS 'msg
                                         (make-methods c)
-                                        (if (equal? (classS-parent c) 'Object)
-                                            (numS -123456789)
-                                            (appS (idS (classS-parent c)) (list (msgidS 'msg))))
-                                        ))))))
+                                        (cond [(symbol=? (classS-parent c) 'Object)(numS -123456789)]
+                                              [else (appS (newS (classS-parent c)(classS-parent-constr-args c))
+                                                          (list (msgidS 'msg)))]
+                                              )))))))
+
+;; Make the parent thing from the class
+(define (make-parent [c : ClassS]) : (listof DefS)
+  (cond [(symbol=? (classS-parent c) 'Object)
+         (list (defS '_parent_ (numS -123123123)))]
+        [else
+         (list (defS '_parent_(newS (classS-parent c)(classS-parent-constr-args c))))])
+  )
+
 
 ;; Builds the list of methods form the getters and setters
 (define (make-methods [c : ClassS]) : (listof DefS)
@@ -445,12 +454,22 @@
                  ))
 
 (define subber '(class Subber (w)
-                 (parent Adder)
+                 (parent Adder 10)
                  (private (q 2))
                  (public (e 6) (b 5))
                  (add (fun (x) (+ x w)))
                  (subpub (fun () (- w t)))
                  ))
+
+
+;(define-type ClassS
+;  [classS (name : symbol)
+;          (parent : symbol) 
+;          (parent-constr-args : (listof ExprS))
+;          (constructor-vars : (listof symbol))
+;          (private-vars : (listof DefS))
+;          (public-vars : (listof DefS))
+;          (methods : (listof DefS))])
 
 
 
@@ -480,7 +499,7 @@
          (numV 100))
 
 
-(test (run/classes '(with ((myobj (new Adder 2)))
+(test (run/classes '(with ((myobj (new Subber 2)))
                           (send myobj useBoth))
                       (list subber adder))
          (numV 8))
