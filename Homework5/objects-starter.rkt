@@ -15,7 +15,9 @@
                         (lamS (list 'msg)
                               (varcaseS 'msg
                                         (make-methods c)
-                                        (numS -1)
+                                        (if (equal? (classS-parent c) 'Object)
+                                            (numS -123456789)
+                                            (appS (idS (classS-parent c)) (list (msgidS 'msg))))
                                         ))))))
 
 ;; Builds the list of methods form the getters and setters
@@ -442,6 +444,14 @@
                  (sett (fun (x) (set t x)))
                  ))
 
+(define subber '(class Subber (w)
+                 (parent Adder)
+                 (private (q 2))
+                 (public (e 6) (b 5))
+                 (add (fun (x) (+ x w)))
+                 (subpub (fun () (- w t)))
+                 ))
+
 
 
 (test (run/classes '(with ((myobj (new Adder 2)))
@@ -468,6 +478,14 @@
                                (send myobj get-v)))
                       (list adder))
          (numV 100))
+
+
+(test (run/classes '(with ((myobj (new Adder 2)))
+                          (send myobj useBoth))
+                      (list subber adder))
+         (numV 8))
+
+
 
 
 
