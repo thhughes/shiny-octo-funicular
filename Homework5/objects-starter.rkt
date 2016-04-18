@@ -14,10 +14,40 @@
                  (withS (get-obj-vars c)
                         (lamS (list 'msg)
                               (varcaseS 'msg
-                                        (classS-methods c)
+                                        (make-methods c)
                                         (numS -1)
                                         ))))))
 
+;; Builds the list of methods form the getters and setters
+(define (make-methods [c : ClassS]) : (listof DefS)
+  (append (make-getter-defs c)
+          (append (make-setter-defs c)
+                  (classS-methods c))))
+
+
+;; Get a list of all of the variable names
+;; ;; lamS((list '_var_)(setS '_thePublicVar '_var)
+(define (make-getter-defs [c : ClassS]) : (listof DefS)
+  (map defs-to-getter (append (classS-public-vars c) (classS-private-vars c)))
+  )
+
+(define (make-setter-defs [c : ClassS]) : (listof DefS)
+  (map defs-to-setter (classS-public-vars c) ))
+  
+
+(define (defs-to-getter [d : DefS]) : DefS
+  (defS (string->symbol (string-append "get-" (symbol->string (defS-name d))))
+        (lamS (list) (defS-val d)))
+  )
+
+(define (defs-to-setter [d : DefS]) : DefS
+  (defS (string->symbol (string-append "set-" (symbol->string (defS-name d))))
+        (lamS (list 'symb )(setS (defS-name d) (idS 'symb)))) ;; Give it our own lambda function
+  )
+
+
+
+;; Returns all of the public and private variables of a classS impl
 (define (get-obj-vars [c : ClassS]) : (listof DefS)
   (append (classS-private-vars c) (classS-public-vars c)))
 
@@ -403,25 +433,41 @@
 
 
 (define adder '(class Adder (w)
-       (parent Object)
-       (private (t 2))
-       (public (v 6) (q 5))
-       (add (fun (x) (+ x w)))
-       (subpub (fun () (- w t)))))
+                 (parent Object)
+                 (private (t 2))
+                 (public (v 6) (q 5))
+                 (add (fun (x) (+ x w)))
+                 (subpub (fun () (- w t)))
+                 (useBoth (fun () (+ t v)))
+                 (sett (fun (x) (set t x)))
+                 ))
 
-(define adder2 '(class Adder (w)
-       (parent Object)
-       (private)
-       (public (v 6) (q 5))
-       (add (fun (x) (+ x w)))
-       (subpub (fun () (- w v)))))
+
 
 (test (run/classes '(with ((myobj (new Adder 2)))
                           (seq (send myobj add 7)
-                               (send myobj subpub)))
+                               (send myobj useBoth)))
                       (list adder))
-         (numV 0))
+         (numV 8))
 
+;; set and get t
+(test (run/classes '(with ((myobj (new Adder 2)))
+                          (seq (send myobj get-t)
+                               (send myobj get-t)))
+                      (list adder))
+         (numV 2))
+
+(test (run/classes '(with ((myobj (new Adder 2)))
+                          (seq (send myobj set-v 100)
+                               (send myobj set-v 100)))
+                      (list adder))
+         (numV 100))
+
+(test (run/classes '(with ((myobj (new Adder 2)))
+                          (seq (send myobj set-v 100)
+                               (send myobj get-v)))
+                      (list adder))
+         (numV 100))
 
 
 
