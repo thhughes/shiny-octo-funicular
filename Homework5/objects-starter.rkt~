@@ -37,7 +37,7 @@
 
 (define (defs-to-getter [d : DefS]) : DefS
   (defS (string->symbol (string-append "get-" (symbol->string (defS-name d))))
-        (lamS (list) (idS (defS-name d))))
+        (lamS (list) (defS-val d)))
   )
 
 (define (defs-to-setter [d : DefS]) : DefS
