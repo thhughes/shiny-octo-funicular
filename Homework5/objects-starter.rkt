@@ -10,17 +10,18 @@
 
 ; edit here to desugar class definitions
 (define (desugar-class [c : ClassS]) : ExprC
-  (desugar (lamS (classS-constructor-vars c)
-                 (withS (get-obj-vars c)
-                        (withS (make-parent c)
-                               (lamS (list 'msg)
-                                     (varcaseS 'msg
-                                               (make-methods c)
+  (desugar (lamS (classS-constructor-vars c)     ;; Build a closure with the given arguments 
+                 (withS (get-obj-vars c)         ;; Get the variables from the class and build them into the env for this instance
+                        (withS (make-parent c)   ;; Build the parent so that inheritence can work
+                               (lamS (list 'msg) ;; Build a closure containing the method calculating function to allow 
+                                     (varcaseS 'msg  ;; Users to call a method
+                                               (make-methods c)   ;; Check if the class can inherit - if it cannot return neg number for fail.
                                                (cond [(symbol=? (classS-parent c) 'Object)(numS -123456789)]
                                                      [else (appS(idS '_parent_ )(list (idS 'msg)))]
                                                      ))))))))
 
-;; Make the parent thing from the class
+;; ClassS ->  Listof DefS
+;; Turns the parent into a listof DefS so that the child class can inherit from it. 
 (define (make-parent [c : ClassS]) : (listof DefS)
   (cond [(symbol=? (classS-parent c) 'Object)
          (list (defS '_parent_ (numS -123123123)))]
@@ -36,11 +37,11 @@
                   (classS-methods c))))
 
 
-;; Making the getter/setter defs's 
+;; Make the getters from a class, only contain the public variables
 (define (make-getter-defs [c : ClassS]) : (listof DefS)
-  (map defs-to-getter (append (classS-public-vars c) (classS-private-vars c)))
-  )
+  (map defs-to-getter (classS-public-vars c)))
 
+;; make the setters from a class, only contains the public variables
 (define (make-setter-defs [c : ClassS]) : (listof DefS)
   (map defs-to-setter (classS-public-vars c) ))
   
@@ -85,9 +86,12 @@
                                                                 (desugar (defS-val opt)))) 
                                                         options) 
                                                (desugar elsecase))]
-    ; edit sendS
+    ;; Run an appS of an appS so that the inner most one gets the closure of the method for the given class
+    ;;  and the external one calls the function with the given arguments
     [sendS (obj msg args) (appC (appC (desugar obj) (list (msgidC msg))) (map desugar args))]
-    ; edit newS
+    ;; This executes the class definition with the given arguments. This means that the classidC will
+    ;;  be used to find the class definition and an execute the stored closure to build an instance with
+    ;;  the given arguments. 
     [newS (classname args) (appC (classidC classname) (map desugar args))] ;; Instantiates a new thing
     ))
 
@@ -441,70 +445,66 @@
 
 
 
-(define adder '(class Adder (w)
+(define classOne '(class ClassOne (w)
                  (parent Object)
-                 (private (t 2))
-                 (public (v 6) (q 5))
-                 (add (fun (x) (+ x w)))
-                 (subpub (fun () (- w t)))
-                 (useBoth (fun () (+ t v)))
-                 (sett (fun (x) (set t x)))
+                 (private (one-val w))
+                 (public (c1-pub-1 6) (c1-pub-2 5))
+                 (c1-add-val-pub-1 (fun (x) (+ x c1-pub-1)))
+                 (c1-add-val-pub-2 (fun (x) (- x c1-pub-2)))
+                 (c1-add-both (fun () (+ c1-pub-1 c1-pub-2)))
+                 (c1-use-private (fun () (+ 1 one-val)))
                  ))
 
-(define subber '(class Subber (w)
-                 (parent Adder 10)
-                 (private (q 2))
-                 (public (e 6) (b 5))
-                 (add (fun (x) (+ x w)))
-                 (subpub (fun () (- w t)))
+(define classTwo '(class ClassTwo (w)
+                 (parent ClassOne 10)
+                 (private (two-val 2))
+                 (public (c2-pub-1 -6) (c2-pub-2 -5))
+                 (c2-add-val-pub-1 (fun (x) (+ x c2-pub-1)))
+                 (c2-add-two-pub-2 (fun () (+ 2 c2-pub-2)))
                  ))
 
 
-;(define-type ClassS
-;  [classS (name : symbol)
-;          (parent : symbol) 
-;          (parent-constr-args : (listof ExprS))
-;          (constructor-vars : (listof symbol))
-;          (private-vars : (listof DefS))
-;          (public-vars : (listof DefS))
-;          (methods : (listof DefS))])
 
+;; Tests that we can get from a class 
+(test (run/classes '(with ((obj-1 (new ClassOne 100)))
+                          (send obj-1 get-c1-pub-1))
+                      (list classOne))
+         (numV 6))
 
+;; Tests that we can use private variables
+(test (run/classes '(with ((obj-1 (new ClassOne 100)))
+                          (send obj-1 c1-use-private))
+                      (list classOne))
+         (numV 101))
 
-(test (run/classes '(with ((myobj (new Adder 2)))
-                          (seq (send myobj add 7)
-                               (send myobj useBoth)))
-                      (list adder))
-         (numV 8))
-
-;; set and get t
-(test (run/classes '(with ((myobj (new Adder 2)))
-                          (seq (send myobj get-t)
-                               (send myobj get-t)))
-                      (list adder))
-         (numV 2))
-
-(test (run/classes '(with ((myobj (new Adder 2)))
-                          (seq (send myobj set-v 100)
-                               (send myobj set-v 100)))
-                      (list adder))
+;; Test Set public variables
+(test (run/classes '(with ((myobj (new ClassOne 100)))
+                          (seq (send myobj set-c1-pub-1 100)
+                               (send myobj get-c1-pub-1)))
+                      (list classOne))
          (numV 100))
 
-(test (run/classes '(with ((myobj (new Subber 2)))
-                          (seq (send myobj set-v 100)
-                               (send myobj get-v)))
-                      (list adder subber))
+;; Test getting public variables of function that has parent object. 
+(test (run/classes '(with ((obj-1 (new ClassTwo 100)))
+                          (send obj-1 get-c2-pub-1))
+                      (list classOne classTwo))
+         (numV -6))
+
+;; Test getting public variables from the parent function.
+(test (run/classes '(with ((obj-1 (new ClassTwo 100)))
+                          (send obj-1 get-c1-pub-1))
+                      (list classOne classTwo))
+         (numV 6))
+
+;; Test running a method that has arguments
+(test (run/classes '(with ((obj-1 (new ClassTwo 100)))
+                          (send obj-1 c2-add-val-pub-1 1234))
+                      (list classOne classTwo))
+         (numV 1228))
+
+;; Test Set public variables of the parent
+(test (run/classes '(with ((myobj (new ClassTwo 100)))
+                          (seq (send myobj set-c1-pub-1 100)
+                               (send myobj get-c1-pub-1)))
+                      (list classOne classTwo))
          (numV 100))
-
-
-(test (run/classes '(with ((myobj (new Adder 2))
-                          (othr (new Subber 2)))
-                          (send othr useBoth))
-                      (list adder subber))
-         (numV 8))
-
-
-
-
-
-
