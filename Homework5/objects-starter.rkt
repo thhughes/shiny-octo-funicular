@@ -36,8 +36,7 @@
                   (classS-methods c))))
 
 
-;; Get a list of all of the variable names
-;; ;; lamS((list '_var_)(setS '_thePublicVar '_var)
+;; Making the getter/setter defs's 
 (define (make-getter-defs [c : ClassS]) : (listof DefS)
   (map defs-to-getter (append (classS-public-vars c) (classS-private-vars c)))
   )
@@ -45,7 +44,7 @@
 (define (make-setter-defs [c : ClassS]) : (listof DefS)
   (map defs-to-setter (classS-public-vars c) ))
   
-
+;; Convert 1 defs to a getter/setter defs
 (define (defs-to-getter [d : DefS]) : DefS
   (defS (string->symbol (string-append "get-" (symbol->string (defS-name d))))
         (lamS (list) (idS (defS-name d))))
@@ -53,7 +52,7 @@
 
 (define (defs-to-setter [d : DefS]) : DefS
   (defS (string->symbol (string-append "set-" (symbol->string (defS-name d))))
-        (lamS (list 'symb )(setS (defS-name d) (idS 'symb)))) ;; Give it our own lambda function
+        (lamS (list 'symb )(setS (defS-name d) (idS 'symb)))) 
   )
 
 
