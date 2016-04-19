@@ -17,7 +17,7 @@
                                      (varcaseS 'msg
                                                (make-methods c)
                                                (cond [(symbol=? (classS-parent c) 'Object)(numS -123456789)]
-                                                     [else (appS (idS '_parent_)(list (msgidS 'msg)))]
+                                                     [else (appS(idS '_parent_ )(list (idS 'msg)))]
                                                      ))))))))
 
 ;; Make the parent thing from the class
@@ -87,7 +87,6 @@
                                                (desugar elsecase))]
     ; edit sendS
     [sendS (obj msg args) (appC (appC (desugar obj) (list (msgidC msg))) (map desugar args))]
-    ; (numC -13429834729834729834)
     ; edit newS
     [newS (classname args) (appC (classidC classname) (map desugar args))] ;; Instantiates a new thing
     ))
@@ -491,16 +490,17 @@
                       (list adder))
          (numV 100))
 
-(test (run/classes '(with ((myobj (new Adder 2)))
+(test (run/classes '(with ((myobj (new Subber 2)))
                           (seq (send myobj set-v 100)
                                (send myobj get-v)))
-                      (list adder))
+                      (list adder subber))
          (numV 100))
 
 
-(test (run/classes '(with ((myobj (new Subber 2)))
-                          (send myobj useBoth))
-                      (list subber adder))
+(test (run/classes '(with ((myobj (new Adder 2))
+                          (othr (new Subber 2)))
+                          (send othr useBoth))
+                      (list adder subber))
          (numV 8))
 
 
