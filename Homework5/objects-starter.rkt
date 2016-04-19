@@ -12,20 +12,20 @@
 (define (desugar-class [c : ClassS]) : ExprC
   (desugar (lamS (classS-constructor-vars c)
                  (withS (get-obj-vars c)
-                        (lamS (list 'msg)
-                              (varcaseS 'msg
-                                        (make-methods c)
-                                        (cond [(symbol=? (classS-parent c) 'Object)(numS -123456789)]
-                                              [else (appS (newS (classS-parent c)(classS-parent-constr-args c))
-                                                          (list (msgidS 'msg)))]
-                                              )))))))
+                        (withS (make-parent c)
+                               (lamS (list 'msg)
+                                     (varcaseS 'msg
+                                               (make-methods c)
+                                               (cond [(symbol=? (classS-parent c) 'Object)(numS -123456789)]
+                                                     [else (appS (idS '_parent_)(list (msgidS 'msg)))]
+                                                     ))))))))
 
 ;; Make the parent thing from the class
 (define (make-parent [c : ClassS]) : (listof DefS)
   (cond [(symbol=? (classS-parent c) 'Object)
          (list (defS '_parent_ (numS -123123123)))]
         [else
-         (list (defS '_parent_(newS (classS-parent c)(classS-parent-constr-args c))))])
+         (list (defS '_parent_ (newS (classS-parent c)(classS-parent-constr-args c))))])
   )
 
 
