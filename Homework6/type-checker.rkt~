@@ -1,0 +1,141 @@
+#lang plai-typed
+
+(require (typed-in racket/sandbox [call-with-limits : (number boolean (-> 'a) -> 'a)]))
+
+;; starter file for type checker assignment 
+
+;;;;;;;;;; Surface Syntax ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-type ExprS
+  [numS (n : number)]
+  [boolS (b : boolean)]
+  [nemptyS]
+  [plusS (l : ExprS) (r : ExprS)]
+  [bminusS (l : ExprS) (r : ExprS)]
+  [multS (l : ExprS) (r : ExprS)]
+  [idS (i : symbol)]
+  [appS (f : ExprS) (arg : ExprS)]
+  [iszeroS (e : ExprS)]
+  [bifS (c : ExprS) (t : ExprS) (e : ExprS)]
+  [lamS (param : symbol) (paramtype : Type) (rettype : Type) (body : ExprS)]
+  [withS (var : symbol) (val : ExprS) (body : ExprS)]
+  [nconsS (e : ExprS) (l : ExprS)]
+  [nisEmptyS (e : ExprS)]
+  [nfirstS (e : ExprS)]
+  [nrestS (e : ExprS)]
+  )
+
+(define-type Type
+  [numT]
+  [boolT]
+  [nlistT]
+  [funT (input : Type) (return : Type)])
+
+;;;;;;;;;;;; Parser ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; parses s-expressions into surface syntax
+(define (parse [s : s-expression]) : ExprS
+  (cond
+    [(s-exp-number? s) (numS (s-exp->number s))]
+    [(s-exp-symbol? s) 
+     (case (s-exp->symbol s)
+       [(true) (boolS true)]
+       [(false) (boolS false)]
+       [(nempty) (nemptyS)]
+       [else (idS (s-exp->symbol s))])]
+    [(s-exp-list? s)
+     (let ([sl (s-exp->list s)])
+       (cond [(s-exp-symbol? (first sl)) ;; built-in construct or calling function through an identifier
+              (case (s-exp->symbol (first sl))
+                [(+) (plusS (parse (second sl)) (parse (third sl)))]
+                [(*) (multS (parse (second sl)) (parse (third sl)))]
+                [(-) (bminusS (parse (second sl)) (parse (third sl)))]
+                [(iszero) (iszeroS (parse (second sl)))]
+                [(bif) (bifS (parse (second sl)) (parse (third sl)) (parse (fourth sl)))]
+                [(fun) (if (= (length sl) 5)
+                           (let ([pspec (s-exp->list (second sl))])
+                             (begin (unless (= (length pspec) 3)
+                                      (error 'parse (string-append "parse error: Malformed parameter specification (expected 3 parts)" (to-string pspec))))
+                                    (unless (eq? ': (s-exp->symbol (third sl)))
+                                      (error 'parse (string-append "parse error: Missing : for output type " (to-string sl))))
+                                    (unless (eq? ': (s-exp->symbol (second pspec)))
+                                      (error 'parse (string-append "parse error: Expected : as second element of parameter syntax in " (to-string pspec))))
+                                    (let ([pname (s-exp->symbol (first pspec))]
+                                          [ptype (parse-type (third pspec))])
+                                      (lamS pname ptype
+                                            (parse-type (fourth sl))
+                                            (parse (fourth (rest sl)))))))
+                           (error 'parse (string-append "parse error: Malformed lambda expression (expected 5 parts)" (to-string s))))]
+                [(with) (let ([bindings (s-exp->list (second sl))]
+                              [body (third sl)])
+                          (begin (unless (= 1 (length bindings))
+                                   (error 'parse (string-append "parse error: with expects list containing one binding but got " (to-string bindings))))
+                                 (let ([binding (s-exp->list (first bindings))])
+                                   (withS (s-exp->symbol (first binding))
+                                          (parse (second binding))
+                                          (parse body)))))]
+                [(ncons) (nconsS (parse (second sl)) (parse (third sl)))]
+                [(nempty?) (nisEmptyS (parse (second sl)))]
+                [(nfirst) (nfirstS (parse (second sl)))]
+                [(nrest) (nrestS (parse (second sl)))]
+                [else ;; must be a function application
+                 (appS (idS (s-exp->symbol (first sl)))
+                       (parse (second sl)))])]
+             [else (appS (parse (first sl))
+                         (parse (second sl)))]))]
+    [else (error 'parse "parse error: unexpected syntax")]))
+
+; parses type annotations in the surface syntax grammar
+;     type ::= number
+;            | boolean
+;            | nlist
+;            | (type -> type)
+(define (parse-type [t : s-expression]) : Type
+  (cond [(s-exp-symbol? t)
+         (case (s-exp->symbol t)
+           [(number) (numT)]
+           [(boolean) (boolT)]
+           [(nlist) (nlistT)]
+           [else (error 'parse-type (string-append "parse error: unrecognized type name " (to-string t)))])]
+        [(s-exp-list? t) ; must be a function type
+         (let ([tl (s-exp->list t)])
+           (if (= (length tl) 3)
+               (let ([tin (parse-type (first tl))]
+                     [tarrow (s-exp->symbol (second tl))]
+                     [tout (parse-type (third tl))])
+                 (if (eq? tarrow '->)
+                     (funT tin tout)
+                     (error 'parse-type (string-append "parse error: Malformed type syntax " (to-string tl)))))
+               (error 'parse-type  (string-append "parse error: Malformed type syntax " (to-string tl)))))]
+        [else (error 'parse-type  (string-append "parse error: Malformed type syntax " (to-string t)))]))
+
+;;;;;;;;;;;;;; type checker ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; type environment
+
+(define-type tBinding
+  [tbind (name : symbol) (type : Type)])
+(define-type-alias typeEnv (listof tBinding))
+(define mt-tenv empty)
+
+; normally, typecheck would take an ExprC, but we will use the output of parse directly
+; for this assignment since no constructs are being desugared
+(define (type-of [e : ExprS] [t : typeEnv]) : Type
+  (numT))
+
+;; lookup a type name in the type environment
+(define (lookup-type [name : symbol] [env : typeEnv])
+  (cond [(empty? env) (error 'lookup-type (string-append "unbound identifier " (to-string name)))]
+        [(cons? env) (if (eq? name (tbind-name (first env)))
+                         (tbind-type (first env))
+                         (lookup-type name (rest env)))]))
+
+;;;;;;;;;;;;; API for type checking programs ;;;;;;;;;;;
+
+; have "type error" be a substring in all type errors raised by your code
+
+(define (typecheck sexp)
+  (call-with-limits 
+   10 #f
+   (lambda () (type-of (parse sexp) mt-tenv))))
+
