@@ -153,9 +153,20 @@
     ;; With's and functions and appc
     [withS (var val body) (let ([new-tenv (build-tenv var val t)])
                             (type-of body new-tenv))]
-    [lamS (param paramtype rettype body)(boolT)]
-    [appS (f arg)(boolT)]
+    [lamS (param ptype rtype body) (let ([newEnv (cons (tbind param ptype) t)])
+                                         (if (equal? rtype (type-of body newEnv))
+                                             (funT ptype rtype)
+                                             (error 'type-check "function does not return corect type")))]
+    [appS (f arg)(let ([f-type (type-of f t)]
+                       [arg-type (type-of arg t)])
+                   (type-case Type f-type
+                     [funT (input return) (if (equal? arg-type input)
+                                              return
+                                              (error 'type-check "args are not correct type"))]
+                     [else (error 'type-check "Attempt to run a function that is not a function")]))]
     ))
+                       
+    
 
 (define (build-tenv [var : symbol][val : ExprS][tenv : typeEnv]) : typeEnv
   (cons (tbind var (type-of val tenv))
@@ -176,7 +187,7 @@
     (if (and (equal? lt (numT))
              (equal? rt (numT)))
         (numT)
-        (error 'tc-math "both arguments are not nubers"))))
+        (error 'type-check "both arguments are not nubers"))))
 
 
 ;; lookup a type name in the type environment
@@ -236,3 +247,51 @@
 (define withNumTMath '(with ([a 10])
                          (+ a a)))
 (test (typecheck withNumTMath) (numT))
+
+;; Test that funT are created by making a fun
+(test (typecheck '(fun (n : number) : number (+ 1 n))) (funT (numT) (numT)))
+
+;; Typecheck calling a function
+(test (typecheck '(with ([a (fun (n : number) : number (+ 1 n))])
+                        (a 10))) (numT))
+
+
+;; Typecheck calling a function that returns a function
+(test (typecheck '(with ([a (fun (x : number) : (number -> number)
+                                 (fun (y : number) : number (+ x y)))])
+                        (a 1)))
+      (funT (numT) (numT)))
+
+;; Test making functions that returns a boolean
+(test (typecheck '(fun (n : number) : boolean true)) (funT (numT) (boolT)))
+
+
+;; Test calling a function that returns a boolean
+(test (typecheck '(with ([a (fun (n : number) : boolean true)])
+                        (bif (a 10)
+                             1000
+                             20)))
+      (numT))
+
+;; Test function returning a list
+(test (typecheck '(with ([a (fun (n : number) : (nlistT) (cons n (cons 2 (cons 3 nempty))))])
+                        (a 10)))
+      (nlistT))
+
+;; Test that plus/sub/mult throws type error
+(test/exn (typecheck '(+ 1 true)) "type")
+(test/exn (typecheck '(- 1 true)) "type")
+(test/exn (typecheck '(* 1 true)) "type")
+
+;; Test that if conditional only works with a boolean as first argument and similar arg types
+(test/exn (typecheck '(bif true 1 true)) "type")
+(test/exn (typecheck '(bif 1 1 1)) "type")
+
+;; Test that that first, rest and isEmpty only work on lists
+(test/exn (typecheck '(first 1)) "type")
+(test/exn (typecheck '(rest 1)) "type")
+(test/exn (typecheck '(nempty? 1)) "type")
+
+;; Test that ncons works only on lists in the correct places and with values in the correct places
+(test/exn (typecheck '(cons nempty nempty)) "type")
+
