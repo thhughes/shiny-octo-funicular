@@ -274,7 +274,7 @@
       (numT))
 
 ;; Test function returning a list
-(test (typecheck '(with ([a (fun (n : number) : (nlistT) (cons n (cons 2 (cons 3 nempty))))])
+(test (typecheck '(with ([a (fun (n : number) : nlist (ncons n (ncons 2 (ncons 3 nempty))))])
                         (a 10)))
       (nlistT))
 
@@ -293,5 +293,5 @@
 (test/exn (typecheck '(nempty? 1)) "type")
 
 ;; Test that ncons works only on lists in the correct places and with values in the correct places
-(test/exn (typecheck '(cons nempty nempty)) "type")
+(test/exn (typecheck '(ncons nempty nempty)) "type")
 
